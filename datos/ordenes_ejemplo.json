@@ -1,0 +1,135 @@
+[
+  {
+    "id": "orden_001",
+    "nivel": 1,
+    "orden": "Trae el vaso",
+    "referencia": {
+      "acciones": [
+        {
+          "accion": "traer",
+          "objetos": [
+            {
+              "nombre": "vaso",
+              "adjetivos": []
+            }
+          ],
+          "personas": [],
+          "lugares": []
+        }
+      ]
+    }
+  },
+  {
+    "id": "orden_002",
+    "nivel": 2,
+    "orden": "Pon el libro azul sobre la mesa pequeña",
+    "referencia": {
+      "acciones": [
+        {
+          "accion": "poner",
+          "objetos": [
+            {
+              "nombre": "libro",
+              "adjetivos": [
+                "azul"
+              ]
+            }
+          ],
+          "personas": [],
+          "lugares": [
+            {
+              "nombre": "mesa",
+              "adjetivos": [
+                "pequeña"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "orden_003",
+    "nivel": 3,
+    "orden": "Ve al cuarto, toma la cobija gris y tráesela a la abuela",
+    "referencia": {
+      "acciones": [
+        {
+          "accion": "ir",
+          "objetos": [],
+          "personas": [],
+          "lugares": [
+            {
+              "nombre": "cuarto",
+              "adjetivos": []
+            }
+          ]
+        },
+        {
+          "accion": "tomar",
+          "objetos": [
+            {
+              "nombre": "cobija",
+              "adjetivos": [
+                "gris"
+              ]
+            }
+          ],
+          "personas": [],
+          "lugares": []
+        },
+        {
+          "accion": "traer",
+          "objetos": [
+            {
+              "nombre": "cobija",
+              "adjetivos": [
+                "gris"
+              ]
+            }
+          ],
+          "personas": [
+            {
+              "nombre": "abuela",
+              "adjetivos": []
+            }
+          ],
+          "lugares": []
+        }
+      ]
+    }
+  },
+  {
+    "id": "orden_004",
+    "nivel": 4,
+    "orden": "Oye porfa me alcanzas el celular que dejé en el cuarto",
+    "referencia": {
+      "acciones": [
+        {
+          "accion": "alcanzar",
+          "objetos": [
+            {
+              "nombre": "celular",
+              "adjetivos": []
+            }
+          ],
+          "personas": [],
+          "lugares": [
+            {
+              "nombre": "cuarto",
+              "adjetivos": []
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "orden_005",
+    "nivel": 5,
+    "orden": "Qué demora la de hoy",
+    "referencia": {
+      "acciones": []
+    }
+  }
+]

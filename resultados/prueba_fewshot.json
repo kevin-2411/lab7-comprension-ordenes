@@ -1,0 +1,17 @@
+[
+  {
+    "transcripcion": "Trae el vaso",
+    "acciones": [],
+    "respuesta": "No pude interpretar la orden. ¿Puedes repetirla?",
+    "json_valido": false,
+    "salida_original": "```json\n{\n  \"acciones\": [\n    {\n      \"accion\": \"traer\",\n      \"objetos\": [\n        {\n          \"nombre\": \"vaso\",\n          \"adjetivos\": []\n        }\n      ],\n      \"personas\": [],\n      \"lugares\": []\n    }\n  ]\n}\n```",
+    "error_formato": "La salida original no es un único JSON válido.",
+    "latencia_llm_s": 10.479033499999787,
+    "ram_actual_proceso_gib": 2.2098922729492188,
+    "vram_actual_torch_gib": 0.0,
+    "id": "orden_001",
+    "modelo": "qwen05",
+    "dispositivo": "cpu",
+    "prompt": "fewshot"
+  }
+]

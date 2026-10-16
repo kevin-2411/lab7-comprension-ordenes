@@ -1,0 +1,33 @@
+[
+  {
+    "transcripcion": "Trae el libro verde",
+    "acciones": [
+      {
+        "accion": "traer",
+        "objetos": [
+          {
+            "nombre": "libro",
+            "adjetivos": [
+              "verde"
+            ]
+          }
+        ],
+        "personas": [],
+        "lugares": []
+      }
+    ],
+    "respuesta": "Voy a traer libro verde.",
+    "json_valido": true,
+    "json_utilizable": true,
+    "markdown_retirado": false,
+    "salida_original": "{\n  \"acciones\": [\n    {\n      \"accion\": \"traer\",\n      \"objetos\": [\n        {\n          \"nombre\": \"libro\",\n          \"adjetivos\": [\"verde\"]\n        }\n      ],\n      \"personas\": [],\n      \"lugares\": []\n    }\n  ]\n}",
+    "error_formato": null,
+    "latencia_llm_s": 24.159095700000762,
+    "ram_actual_proceso_gib": 6.134380340576172,
+    "vram_actual_torch_gib": 0.0,
+    "id": "orden_001",
+    "modelo": "qwen15",
+    "dispositivo": "cpu",
+    "prompt": "fewshot"
+  }
+]

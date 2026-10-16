@@ -1,0 +1,31 @@
+[
+  {
+    "transcripcion": "Tráeme eso",
+    "acciones": [
+      {
+        "accion": "traer",
+        "objetos": [
+          {
+            "nombre": "eso",
+            "adjetivos": []
+          }
+        ],
+        "personas": [],
+        "lugares": []
+      }
+    ],
+    "respuesta": "Voy a traer eso.",
+    "json_valido": false,
+    "json_utilizable": true,
+    "markdown_retirado": true,
+    "salida_original": "```json\n{\n  \"acciones\": [\n    {\n      \"accion\": \"traer\",\n      \"objetos\": [\n        {\n          \"nombre\": \"eso\",\n          \"adjetivos\": []\n        }\n      ],\n      \"personas\": [],\n      \"lugares\": []\n    }\n  ]\n}\n```",
+    "error_formato": "La salida original no es un único JSON válido.",
+    "latencia_llm_s": 27.639211800007615,
+    "ram_actual_proceso_gib": 6.153717041015625,
+    "vram_actual_torch_gib": 0.0,
+    "id": "orden_001",
+    "modelo": "qwen15",
+    "dispositivo": "cpu",
+    "prompt": "fewshot"
+  }
+]

@@ -1,0 +1,55 @@
+[
+  {
+    "transcripcion": "Trá el libro Verde.",
+    "acciones": [
+      {
+        "accion": "traer",
+        "objetos": [
+          {
+            "nombre": "libro",
+            "adjetivos": [
+              "verde"
+            ]
+          }
+        ],
+        "personas": [],
+        "lugares": []
+      }
+    ],
+    "acciones_ejecutables": [
+      {
+        "accion": "traer",
+        "objetos": [
+          {
+            "nombre": "libro",
+            "adjetivos": [
+              "verde"
+            ]
+          }
+        ],
+        "personas": [],
+        "lugares": []
+      }
+    ],
+    "requiere_aclaracion": false,
+    "referentes_sin_resolver": [],
+    "respuesta": "Voy a traer libro verde.",
+    "json_valido": true,
+    "json_utilizable": true,
+    "markdown_retirado": false,
+    "salida_original": "{\n  \"acciones\": [\n    {\n      \"accion\": \"traer\",\n      \"objetos\": [\n        {\n          \"nombre\": \"libro\",\n          \"adjetivos\": [\"verde\"]\n        }\n      ],\n      \"personas\": [],\n      \"lugares\": []\n    }\n  ]\n}",
+    "error_formato": null,
+    "latencia_llm_s": 31.585201800000505,
+    "latencia_s2t_s": 0.6634507999988273,
+    "latencia_t2s_s": 2.091249400007655,
+    "latencia_total_s": 34.360865900001954,
+    "audio_respuesta": "resultados\\respuestas_audio\\orden_001.wav",
+    "ram_actual_proceso_gib": 6.352802276611328,
+    "vram_actual_torch_gib": 0.0,
+    "id": "orden_001",
+    "modelo": "qwen15",
+    "dispositivo": "cpu",
+    "prompt": "fewshot",
+    "archivo_entrada": "audios\\audio1.ogg"
+  }
+]

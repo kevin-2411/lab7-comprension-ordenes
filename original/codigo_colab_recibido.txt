@@ -1,0 +1,1626 @@
+# ============================================================
+# LABORATORIO 7 - NLP Y LLMs
+# Comprensión de órdenes en español para robots con LLMs ligeros
+# GOOGLE COLAB - CÓDIGO COMPLETO EN UNA SOLA CELDA
+# ============================================================
+
+# ============================================================
+# 1. INSTALACIÓN DE LIBRERÍAS
+# ============================================================
+
+!pip -q install transformers accelerate sentencepiece
+!pip -q install faster-whisper
+!pip -q install piper-tts
+!pip -q install huggingface_hub
+!pip -q install spacy
+!pip -q install jiwer
+!pip -q install psutil pandas scikit-learn
+
+!python -m spacy download es_core_news_sm -q
+
+print("\n✅ Librerías instaladas correctamente.\n")
+
+
+# ============================================================
+# 2. IMPORTACIONES
+# ============================================================
+
+import os
+import gc
+import json
+import time
+import psutil
+import subprocess
+import numpy as np
+import pandas as pd
+import torch
+import spacy
+
+from faster_whisper import WhisperModel
+from transformers import AutoTokenizer, AutoModelForCausalLM
+from huggingface_hub import hf_hub_download
+from jiwer import wer
+from google.colab import files
+from IPython.display import Audio, display
+
+
+print("=" * 70)
+print("INFORMACIÓN DEL ENTORNO")
+print("=" * 70)
+
+print("PyTorch:", torch.__version__)
+print("CPU:", os.cpu_count())
+print(
+    "RAM total:",
+    round(psutil.virtual_memory().total / (1024**3), 2),
+    "GB"
+)
+
+
+# ============================================================
+# 3. CONFIGURACIÓN GENERAL
+# ============================================================
+
+WHISPER_SIZE = "tiny"
+
+# Modelo principal para hacer la demostración
+MODELO_PRINCIPAL = "Qwen/Qwen2.5-0.5B-Instruct"
+
+# Tres modelos para comparación
+MODELOS = {
+    "Qwen2.5-0.5B": "Qwen/Qwen2.5-0.5B-Instruct",
+    "Qwen2.5-1.5B": "Qwen/Qwen2.5-1.5B-Instruct",
+    "SmolLM2-1.7B": "HuggingFaceTB/SmolLM2-1.7B-Instruct"
+}
+
+
+# ============================================================
+# 4. PROMPT DEL SISTEMA
+# ============================================================
+
+PROMPT_SISTEMA = """
+Eres un sistema de comprensión de órdenes en español para un robot.
+
+Debes analizar la orden del usuario y devolver ÚNICAMENTE
+un objeto JSON válido.
+
+NO escribas explicaciones ni comentarios fuera del JSON.
+
+La estructura es:
+
+{
+  "acciones": [
+    {
+      "accion": "infinitivo",
+      "objetos": [
+        {
+          "nombre": "nombre",
+          "adjetivos": []
+        }
+      ],
+      "personas": [
+        {
+          "nombre": "nombre",
+          "adjetivos": []
+        }
+      ],
+      "lugares": [
+        {
+          "nombre": "nombre",
+          "adjetivos": []
+        }
+      ]
+    }
+  ]
+}
+
+REGLAS:
+
+1. Las acciones deben estar en infinitivo y minúscula.
+2. Los nombres deben ir sin artículos.
+3. Los adjetivos deben conservarse como aparecen en la orden.
+4. Los pronombres deben reemplazarse por su referente cuando sea claro.
+5. "tú" y "yo" no se anotan como personas.
+6. Si no existe una orden para el robot, devuelve:
+   {"acciones": []}
+7. NO inventes entidades.
+8. Si una categoría no aparece, utiliza una lista vacía.
+9. Una orden puede tener varias acciones.
+10. Si existe ambigüedad y no hay referente, no inventes información.
+"""
+
+
+# ============================================================
+# 5. PROMPT FEW-SHOT
+# ============================================================
+
+PROMPT_FEWSHOT = """
+Eres un sistema de comprensión de órdenes en español para un robot.
+
+Devuelve ÚNICAMENTE JSON válido.
+
+Ejemplo 1
+
+Orden:
+Trae el vaso
+
+Salida:
+{
+  "acciones": [
+    {
+      "accion": "traer",
+      "objetos": [
+        {
+          "nombre": "vaso",
+          "adjetivos": []
+        }
+      ],
+      "personas": [],
+      "lugares": []
+    }
+  ]
+}
+
+Ejemplo 2
+
+Orden:
+Lleva la taza roja a la cocina y entrégasela a María
+
+Salida:
+{
+  "acciones": [
+    {
+      "accion": "llevar",
+      "objetos": [
+        {
+          "nombre": "taza",
+          "adjetivos": ["roja"]
+        }
+      ],
+      "personas": [],
+      "lugares": [
+        {
+          "nombre": "cocina",
+          "adjetivos": []
+        }
+      ]
+    },
+    {
+      "accion": "entregar",
+      "objetos": [
+        {
+          "nombre": "taza",
+          "adjetivos": ["roja"]
+        }
+      ],
+      "personas": [
+        {
+          "nombre": "María",
+          "adjetivos": []
+        }
+      ],
+      "lugares": []
+    }
+  ]
+}
+
+Ejemplo 3
+
+Orden:
+Qué demora la de hoy
+
+Salida:
+{
+  "acciones": []
+}
+
+REGLAS:
+
+- Acción en infinitivo.
+- Acción en minúscula.
+- Nombres sin artículo.
+- Mantener los adjetivos.
+- Resolver pronombres únicamente cuando exista referente.
+- No inventar personas, objetos ni lugares.
+- Si no es una orden, usar {"acciones":[]}.
+"""
+
+
+# ============================================================
+# 6. CARGAR WHISPER
+# ============================================================
+
+print("\n" + "=" * 70)
+print("CARGANDO WHISPER")
+print("=" * 70)
+
+whisper_model = WhisperModel(
+    WHISPER_SIZE,
+    device="cpu",
+    compute_type="int8"
+)
+
+print(f"✅ Whisper {WHISPER_SIZE} cargado.")
+
+
+# ============================================================
+# 7. FUNCIÓN DE TRANSCRIPCIÓN
+# ============================================================
+
+def transcribir(audio_path, modelo_whisper=None):
+
+    modelo = (
+        modelo_whisper
+        if modelo_whisper is not None
+        else whisper_model
+    )
+
+    segments, info = modelo.transcribe(
+        audio_path,
+        language="es",
+        beam_size=5
+    )
+
+    texto = " ".join(
+        segmento.text.strip()
+        for segmento in segments
+    )
+
+    return texto.strip()
+
+
+# ============================================================
+# 8. FUNCIONES DEL LLM
+# ============================================================
+
+def cargar_llm(model_id):
+
+    print("\nCargando modelo:")
+    print(model_id)
+
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_id,
+        trust_remote_code=True
+    )
+
+    model = AutoModelForCausalLM.from_pretrained(
+        model_id,
+        torch_dtype=torch.float32,
+        low_cpu_mem_usage=True,
+        trust_remote_code=True
+    )
+
+    model.eval()
+
+    print("✅ Modelo cargado.")
+
+    return tokenizer, model
+
+
+def generar_llm(
+    orden,
+    tokenizer,
+    model,
+    prompt_sistema=PROMPT_SISTEMA,
+    max_new_tokens=350
+):
+
+    mensajes = [
+        {
+            "role": "system",
+            "content": prompt_sistema
+        },
+        {
+            "role": "user",
+            "content": f"Orden: {orden}"
+        }
+    ]
+
+    prompt = tokenizer.apply_chat_template(
+        mensajes,
+        tokenize=False,
+        add_generation_prompt=True
+    )
+
+    inputs = tokenizer(
+        prompt,
+        return_tensors="pt"
+    )
+
+    inicio = time.time()
+
+    with torch.no_grad():
+
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+            pad_token_id=tokenizer.eos_token_id
+        )
+
+    latencia = time.time() - inicio
+
+    tokens_nuevos = outputs[0][
+        inputs["input_ids"].shape[1]:
+    ]
+
+    respuesta = tokenizer.decode(
+        tokens_nuevos,
+        skip_special_tokens=True
+    )
+
+    return respuesta.strip(), latencia
+
+
+# ============================================================
+# 9. EXTRAER JSON
+# ============================================================
+
+def extraer_json_de_texto(texto):
+
+    texto = texto.strip()
+
+    texto = texto.replace("```json", "")
+    texto = texto.replace("```JSON", "")
+    texto = texto.replace("```", "")
+
+    inicio = texto.find("{")
+    fin = texto.rfind("}")
+
+    if inicio == -1 or fin == -1:
+        return None
+
+    fragmento = texto[inicio:fin + 1]
+
+    try:
+        return json.loads(fragmento)
+
+    except json.JSONDecodeError:
+        return None
+
+
+def es_json_valido(texto):
+
+    return extraer_json_de_texto(texto) is not None
+
+
+# ============================================================
+# 10. RESPUESTA DEL ROBOT
+# ============================================================
+
+def generar_respuesta_robot(data):
+
+    if data is None:
+        return "No pude interpretar correctamente la orden."
+
+    acciones = data.get("acciones", [])
+
+    if not acciones:
+        return "No entendí ninguna orden."
+
+    partes = []
+
+    for acc in acciones:
+
+        accion = acc.get("accion", "")
+
+        objetos = acc.get("objetos", [])
+        personas = acc.get("personas", [])
+        lugares = acc.get("lugares", [])
+
+        elementos = []
+
+        if objetos:
+
+            objeto = objetos[0]
+
+            nombre = objeto.get("nombre", "")
+
+            adjetivos = " ".join(
+                objeto.get("adjetivos", [])
+            )
+
+            texto_objeto = (
+                f"{nombre} {adjetivos}"
+            ).strip()
+
+            elementos.append(texto_objeto)
+
+        if lugares:
+
+            lugar = lugares[0].get(
+                "nombre",
+                ""
+            )
+
+            elementos.append(
+                f"a {lugar}"
+            )
+
+        if personas:
+
+            persona = personas[0].get(
+                "nombre",
+                ""
+            )
+
+            elementos.append(
+                f"a {persona}"
+            )
+
+        contenido = " ".join(elementos)
+
+        partes.append(
+            f"Voy a {accion} {contenido}".strip()
+        )
+
+    return " y ".join(partes)
+
+
+# ============================================================
+# 11. DESCARGAR VOZ PIPER
+# ============================================================
+
+print("\n" + "=" * 70)
+print("DESCARGANDO VOZ DE PIPER")
+print("=" * 70)
+
+PIPER_REPO = "rhasspy/piper-voices"
+
+PIPER_MODEL = hf_hub_download(
+    repo_id=PIPER_REPO,
+    filename=(
+        "es/es_ES/davefx/medium/"
+        "es_ES-davefx-medium.onnx"
+    )
+)
+
+PIPER_CONFIG = hf_hub_download(
+    repo_id=PIPER_REPO,
+    filename=(
+        "es/es_ES/davefx/medium/"
+        "es_ES-davefx-medium.onnx.json"
+    )
+)
+
+print("✅ Piper descargado.")
+
+
+# ============================================================
+# 12. FUNCIÓN PIPER
+# ============================================================
+
+def sintetizar_piper(
+    texto,
+    salida="respuesta_robot.wav"
+):
+
+    comando = [
+        "piper",
+        "--model",
+        PIPER_MODEL,
+        "--output_file",
+        salida
+    ]
+
+    proceso = subprocess.run(
+        comando,
+        input=texto.encode("utf-8"),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+
+    if proceso.returncode != 0:
+
+        print(
+            "Error Piper:",
+            proceso.stderr.decode()
+        )
+
+        return None
+
+    return salida
+
+
+# ============================================================
+# 13. MEMORIA RAM
+# ============================================================
+
+def memoria_actual_gb():
+
+    proceso = psutil.Process(
+        os.getpid()
+    )
+
+    return (
+        proceso.memory_info().rss
+        / (1024**3)
+    )
+
+
+# ============================================================
+# 14. SPACY
+# ============================================================
+
+nlp = spacy.load(
+    "es_core_news_sm"
+)
+
+
+def lematizar_verbo(verbo):
+
+    doc = nlp(verbo)
+
+    for token in doc:
+
+        if token.pos_ in [
+            "VERB",
+            "AUX"
+        ]:
+
+            return token.lemma_.lower()
+
+    return verbo.lower()
+
+
+# ============================================================
+# 15. FUNCIONES F1
+# ============================================================
+
+def extraer_categorias(data):
+
+    categorias = {
+        "acciones": set(),
+        "objetos": set(),
+        "personas": set(),
+        "adjetivos": set(),
+        "lugares": set()
+    }
+
+    if data is None:
+        return categorias
+
+    for accion in data.get(
+        "acciones",
+        []
+    ):
+
+        nombre_accion = accion.get(
+            "accion",
+            ""
+        )
+
+        if nombre_accion:
+
+            categorias["acciones"].add(
+                nombre_accion.lower()
+            )
+
+        for obj in accion.get(
+            "objetos",
+            []
+        ):
+
+            nombre = obj.get(
+                "nombre",
+                ""
+            )
+
+            if nombre:
+
+                categorias["objetos"].add(
+                    nombre.lower()
+                )
+
+            for adj in obj.get(
+                "adjetivos",
+                []
+            ):
+
+                categorias[
+                    "adjetivos"
+                ].add(adj.lower())
+
+        for persona in accion.get(
+            "personas",
+            []
+        ):
+
+            nombre = persona.get(
+                "nombre",
+                ""
+            )
+
+            if nombre:
+
+                categorias[
+                    "personas"
+                ].add(nombre.lower())
+
+            for adj in persona.get(
+                "adjetivos",
+                []
+            ):
+
+                categorias[
+                    "adjetivos"
+                ].add(adj.lower())
+
+        for lugar in accion.get(
+            "lugares",
+            []
+        ):
+
+            nombre = lugar.get(
+                "nombre",
+                ""
+            )
+
+            if nombre:
+
+                categorias[
+                    "lugares"
+                ].add(nombre.lower())
+
+            for adj in lugar.get(
+                "adjetivos",
+                []
+            ):
+
+                categorias[
+                    "adjetivos"
+                ].add(adj.lower())
+
+    return categorias
+
+
+def f1_conjuntos(real, pred):
+
+    real = set(real)
+    pred = set(pred)
+
+    if not real and not pred:
+        return 1.0
+
+    if not real or not pred:
+        return 0.0
+
+    tp = len(
+        real.intersection(pred)
+    )
+
+    precision = tp / len(pred)
+    recall = tp / len(real)
+
+    if precision + recall == 0:
+        return 0.0
+
+    return (
+        2
+        * precision
+        * recall
+        / (precision + recall)
+    )
+
+
+def calcular_f1_json(
+    real_json,
+    pred_json
+):
+
+    real = extraer_categorias(
+        real_json
+    )
+
+    pred = extraer_categorias(
+        pred_json
+    )
+
+    resultados = {}
+
+    for categoria in real:
+
+        resultados[categoria] = (
+            f1_conjuntos(
+                real[categoria],
+                pred[categoria]
+            )
+        )
+
+    resultados[
+        "F1_promedio"
+    ] = np.mean(
+        list(resultados.values())
+    )
+
+    return resultados
+
+
+# ============================================================
+# 16. CARGAR MODELO PRINCIPAL
+# ============================================================
+
+print("\n" + "=" * 70)
+print("CARGANDO MODELO PRINCIPAL")
+print("=" * 70)
+
+tokenizer, llm_model = cargar_llm(
+    MODELO_PRINCIPAL
+)
+
+
+# ============================================================
+# 17. SUBIR AUDIO
+# ============================================================
+
+print("\n" + "=" * 70)
+print("SUBIR AUDIO DE PRUEBA")
+print("=" * 70)
+
+print(
+    "Selecciona un audio .wav, .mp3, .m4a, etc."
+)
+
+uploaded = files.upload()
+
+audio_path = list(
+    uploaded.keys()
+)[0]
+
+print(
+    "\n✅ Archivo:",
+    audio_path
+)
+
+
+# ============================================================
+# 18. PIPELINE COMPLETO
+# ============================================================
+
+print("\n" + "=" * 70)
+print("PIPELINE COMPLETO")
+print("=" * 70)
+
+inicio_total = time.time()
+
+
+# ---------- S2T ----------
+
+inicio = time.time()
+
+transcripcion = transcribir(
+    audio_path
+)
+
+latencia_s2t = (
+    time.time() - inicio
+)
+
+print(
+    "\n📝 TRANSCRIPCIÓN:"
+)
+
+print(transcripcion)
+
+
+# ---------- LLM ----------
+
+salida_raw, latencia_llm = (
+    generar_llm(
+        transcripcion,
+        tokenizer,
+        llm_model
+    )
+)
+
+print(
+    "\n🤖 SALIDA DEL LLM:"
+)
+
+print(salida_raw)
+
+
+# ---------- JSON ----------
+
+resultado_json = (
+    extraer_json_de_texto(
+        salida_raw
+    )
+)
+
+print(
+    "\n📦 JSON ESTRUCTURADO:"
+)
+
+if resultado_json is not None:
+
+    print(
+        json.dumps(
+            resultado_json,
+            ensure_ascii=False,
+            indent=2
+        )
+    )
+
+else:
+
+    print(
+        "❌ El modelo no produjo JSON válido."
+    )
+
+
+# ---------- RESPUESTA ----------
+
+respuesta_robot = (
+    generar_respuesta_robot(
+        resultado_json
+    )
+)
+
+print(
+    "\n💬 RESPUESTA DEL ROBOT:"
+)
+
+print(
+    respuesta_robot
+)
+
+
+# ---------- T2S ----------
+
+archivo_audio = (
+    sintetizar_piper(
+        respuesta_robot
+    )
+)
+
+
+# ---------- RESULTADOS ----------
+
+latencia_total = (
+    time.time()
+    - inicio_total
+)
+
+resultado_pipeline = {
+
+    "transcripcion":
+        transcripcion,
+
+    "acciones":
+        (
+            resultado_json.get(
+                "acciones",
+                []
+            )
+            if resultado_json
+            else []
+        ),
+
+    "respuesta":
+        respuesta_robot,
+
+    "json_valido":
+        resultado_json is not None,
+
+    "latencia_s2t_s":
+        round(
+            latencia_s2t,
+            3
+        ),
+
+    "latencia_llm_s":
+        round(
+            latencia_llm,
+            3
+        ),
+
+    "latencia_total_s":
+        round(
+            latencia_total,
+            3
+        ),
+
+    "RAM_GB":
+        round(
+            memoria_actual_gb(),
+            3
+        )
+}
+
+
+print(
+    "\n📊 RESULTADO DEL PIPELINE:"
+)
+
+print(
+    json.dumps(
+        resultado_pipeline,
+        ensure_ascii=False,
+        indent=2
+    )
+)
+
+
+# ---------- ESCUCHAR RESPUESTA ----------
+
+if archivo_audio is not None:
+
+    print(
+        "\n🔊 AUDIO GENERADO:"
+    )
+
+    display(
+        Audio(
+            archivo_audio
+        )
+    )
+
+
+# ============================================================
+# 19. PRUEBAS DE LOS CINCO NIVELES
+# ============================================================
+
+print("\n" + "=" * 70)
+print("PRUEBAS DE LOS CINCO NIVELES")
+print("=" * 70)
+
+ordenes_prueba = [
+
+    {
+        "nivel": 1,
+        "orden":
+        "Trae el vaso"
+    },
+
+    {
+        "nivel": 2,
+        "orden":
+        "Pon el libro azul sobre la mesa pequeña"
+    },
+
+    {
+        "nivel": 3,
+        "orden":
+        "Ve al cuarto, toma la cobija gris y tráesela a la abuela"
+    },
+
+    {
+        "nivel": 4,
+        "orden":
+        "Oye porfa me alcanzas el celular que dejé en el cuarto"
+    },
+
+    {
+        "nivel": 5,
+        "orden":
+        "Qué demora la de hoy"
+    }
+
+]
+
+
+resultados_niveles = []
+
+
+for item in ordenes_prueba:
+
+    print(
+        "\n" + "-" * 70
+    )
+
+    print(
+        "Nivel:",
+        item["nivel"]
+    )
+
+    print(
+        "Orden:",
+        item["orden"]
+    )
+
+    salida, latencia = (
+        generar_llm(
+            item["orden"],
+            tokenizer,
+            llm_model
+        )
+    )
+
+    valido = es_json_valido(
+        salida
+    )
+
+    print(
+        "\nSalida:"
+    )
+
+    print(
+        salida
+    )
+
+    print(
+        "JSON válido:",
+        valido
+    )
+
+    print(
+        "Latencia:",
+        round(
+            latencia,
+            3
+        ),
+        "s"
+    )
+
+    resultados_niveles.append({
+
+        "Nivel":
+            item["nivel"],
+
+        "Orden":
+            item["orden"],
+
+        "JSON_valido":
+            valido,
+
+        "Latencia_s":
+            round(
+                latencia,
+                3
+            )
+
+    })
+
+
+df_niveles = pd.DataFrame(
+    resultados_niveles
+)
+
+print(
+    "\n📊 TABLA DE NIVELES:"
+)
+
+display(
+    df_niveles
+)
+
+
+# ============================================================
+# 20. PRUEBA FEW-SHOT
+# ============================================================
+
+print("\n" + "=" * 70)
+print("PRUEBA CON FEW-SHOT")
+print("=" * 70)
+
+
+orden_dificil = (
+    "Oye porfa me alcanzas "
+    "el celular que dejé en el cuarto"
+)
+
+
+salida_fewshot, tiempo_fewshot = (
+    generar_llm(
+        orden_dificil,
+        tokenizer,
+        llm_model,
+        prompt_sistema=PROMPT_FEWSHOT
+    )
+)
+
+
+print(
+    "Orden:"
+)
+
+print(
+    orden_dificil
+)
+
+print(
+    "\nSalida few-shot:"
+)
+
+print(
+    salida_fewshot
+)
+
+print(
+    "\nLatencia:",
+    round(
+        tiempo_fewshot,
+        3
+    ),
+    "s"
+)
+
+
+# ============================================================
+# 21. PRUEBA SPACY
+# ============================================================
+
+print("\n" + "=" * 70)
+print("PRUEBA SPACY")
+print("=" * 70)
+
+verbos = [
+    "trae",
+    "lleva",
+    "busca",
+    "entrega"
+]
+
+for verbo in verbos:
+
+    print(
+        verbo,
+        "->",
+        lematizar_verbo(verbo)
+    )
+
+
+# ============================================================
+# 22. COMPARACIÓN WHISPER TINY VS SMALL
+# ============================================================
+
+print("\n" + "=" * 70)
+print("COMPARACIÓN WHISPER TINY VS SMALL")
+print("=" * 70)
+
+
+whisper_tiny = WhisperModel(
+    "tiny",
+    device="cpu",
+    compute_type="int8"
+)
+
+
+inicio = time.time()
+
+texto_tiny = transcribir(
+    audio_path,
+    whisper_tiny
+)
+
+tiempo_tiny = (
+    time.time()
+    - inicio
+)
+
+
+print(
+    "\nDescargando/cargando Whisper small..."
+)
+
+
+whisper_small = WhisperModel(
+    "small",
+    device="cpu",
+    compute_type="int8"
+)
+
+
+inicio = time.time()
+
+texto_small = transcribir(
+    audio_path,
+    whisper_small
+)
+
+tiempo_small = (
+    time.time()
+    - inicio
+)
+
+
+print(
+    "\nWHISPER TINY:"
+)
+
+print(
+    texto_tiny
+)
+
+print(
+    "Tiempo:",
+    round(
+        tiempo_tiny,
+        3
+    ),
+    "s"
+)
+
+
+print(
+    "\nWHISPER SMALL:"
+)
+
+print(
+    texto_small
+)
+
+print(
+    "Tiempo:",
+    round(
+        tiempo_small,
+        3
+    ),
+    "s"
+)
+
+
+# ============================================================
+# 23. TRANSCRIPCIÓN CORRECTA Y WER
+# ============================================================
+
+print("\n" + "=" * 70)
+print("CÁLCULO DEL WER")
+print("=" * 70)
+
+print(
+    "\nEscribe EXACTAMENTE lo que dijiste "
+    "en el audio y presiona Enter."
+)
+
+transcripcion_correcta = input(
+    "\nTranscripción correcta: "
+).strip()
+
+
+if transcripcion_correcta:
+
+    wer_tiny = wer(
+        transcripcion_correcta.lower(),
+        texto_tiny.lower()
+    )
+
+    wer_small = wer(
+        transcripcion_correcta.lower(),
+        texto_small.lower()
+    )
+
+    print(
+        "\nWER Whisper tiny:",
+        round(
+            wer_tiny * 100,
+            2
+        ),
+        "%"
+    )
+
+    print(
+        "WER Whisper small:",
+        round(
+            wer_small * 100,
+            2
+        ),
+        "%"
+    )
+
+else:
+
+    print(
+        "No ingresaste transcripción."
+    )
+
+    wer_tiny = None
+    wer_small = None
+
+
+# ============================================================
+# 24. TABLA S2T
+# ============================================================
+
+tabla_s2t = pd.DataFrame([
+
+    {
+        "Modelo":
+            "Whisper tiny",
+
+        "Transcripción":
+            texto_tiny,
+
+        "Latencia_s":
+            round(
+                tiempo_tiny,
+                3
+            ),
+
+        "WER_%":
+            (
+                round(
+                    wer_tiny * 100,
+                    2
+                )
+                if wer_tiny is not None
+                else None
+            )
+    },
+
+    {
+        "Modelo":
+            "Whisper small",
+
+        "Transcripción":
+            texto_small,
+
+        "Latencia_s":
+            round(
+                tiempo_small,
+                3
+            ),
+
+        "WER_%":
+            (
+                round(
+                    wer_small * 100,
+                    2
+                )
+                if wer_small is not None
+                else None
+            )
+    }
+
+])
+
+
+print(
+    "\n📊 COMPARACIÓN S2T:"
+)
+
+display(
+    tabla_s2t
+)
+
+
+# ============================================================
+# 25. LIBERAR MODELO PRINCIPAL ANTES DEL BENCHMARK
+# ============================================================
+
+del llm_model
+del tokenizer
+
+gc.collect()
+
+
+# ============================================================
+# 26. COMPARACIÓN DE TRES LLM
+# ============================================================
+
+print("\n" + "=" * 70)
+print("COMPARACIÓN DE TRES LLM")
+print("=" * 70)
+
+print(
+    "\n⚠️ Esta sección puede tardar porque "
+    "los modelos se ejecutan de forma secuencial."
+)
+
+
+ordenes_benchmark = [
+
+    "Trae el vaso",
+
+    "Pon el libro azul sobre la mesa pequeña",
+
+    "Lleva la taza roja a la cocina y entrégasela a María",
+
+    "Oye porfa me alcanzas el celular que dejé en el cuarto",
+
+    "Qué demora la de hoy"
+
+]
+
+
+resultados_modelos = []
+
+
+for nombre, model_id in MODELOS.items():
+
+    print(
+        "\n" + "=" * 70
+    )
+
+    print(
+        "MODELO:",
+        nombre
+    )
+
+    print(
+        "=" * 70
+    )
+
+
+    tokenizer_temp, modelo_temp = (
+        cargar_llm(
+            model_id
+        )
+    )
+
+
+    latencias = []
+
+    json_validos = []
+
+
+    for orden in ordenes_benchmark:
+
+        salida, latencia = (
+            generar_llm(
+                orden,
+                tokenizer_temp,
+                modelo_temp
+            )
+        )
+
+
+        valido = (
+            es_json_valido(
+                salida
+            )
+        )
+
+
+        latencias.append(
+            latencia
+        )
+
+
+        json_validos.append(
+            valido
+        )
+
+
+        print(
+            "\nOrden:"
+        )
+
+        print(
+            orden
+        )
+
+
+        print(
+            "Salida:"
+        )
+
+        print(
+            salida
+        )
+
+
+        print(
+            "JSON válido:",
+            valido
+        )
+
+
+        print(
+            "Latencia:",
+            round(
+                latencia,
+                3
+            ),
+            "s"
+        )
+
+
+    memoria = (
+        memoria_actual_gb()
+    )
+
+
+    resultados_modelos.append({
+
+        "Modelo":
+            nombre,
+
+        "Latencia_mediana_s":
+            round(
+                float(
+                    np.median(
+                        latencias
+                    )
+                ),
+                3
+            ),
+
+        "RAM_GB_aprox":
+            round(
+                memoria,
+                3
+            ),
+
+        "JSON_valido_%":
+            round(
+                np.mean(
+                    json_validos
+                )
+                * 100,
+                2
+            )
+
+    })
+
+
+    del modelo_temp
+    del tokenizer_temp
+
+    gc.collect()
+
+
+# ============================================================
+# 27. TABLA COMPARATIVA LLM
+# ============================================================
+
+df_modelos = pd.DataFrame(
+    resultados_modelos
+)
+
+
+print(
+    "\n📊 TABLA COMPARATIVA DE MODELOS:"
+)
+
+display(
+    df_modelos
+)
+
+
+# ============================================================
+# 28. TABLA FINAL BASE
+# ============================================================
+
+tabla_final = pd.DataFrame(
+    columns=[
+        "Modelo",
+        "F1_promedio",
+        "F1_niveles_4_5",
+        "Estructura_%",
+        "JSON_valido_%",
+        "Latencia_s",
+        "RAM_GB",
+        "WER_%"
+    ]
+)
+
+
+print(
+    "\n📋 ESTRUCTURA DE TABLA FINAL:"
+)
+
+display(
+    tabla_final
+)
+
+
+# ============================================================
+# 29. RESUMEN
+# ============================================================
+
+print("\n" + "=" * 70)
+print("LABORATORIO EJECUTADO")
+print("=" * 70)
+
+print(
+    """
+✅ Speech-to-Text con Whisper
+✅ Comprensión con LLM ligero
+✅ Extracción de JSON
+✅ Generación de respuesta
+✅ Text-to-Speech con Piper
+✅ Prueba de 5 niveles
+✅ Few-shot prompting
+✅ spaCy
+✅ Comparación Whisper tiny vs small
+✅ WER
+✅ Comparación de 3 LLM
+✅ Latencia
+✅ RAM
+✅ JSON válido
+
+FIN.
+"""
+)

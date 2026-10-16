@@ -1,0 +1,19 @@
+[
+  {
+    "transcripcion": "Tráeme eso",
+    "acciones": [],
+    "respuesta": "No pude interpretar la orden. ¿Puedes repetirla?",
+    "json_valido": false,
+    "json_utilizable": false,
+    "markdown_retirado": false,
+    "salida_original": "{\n  \"acciones\": [\n    {\n      \"accion\": \"traer\",\n      \"objetos\": [\n        {\n          \"nombre\": \"eso\"\n        }\n      ],\n      \"personas\": [],\n      \"lugares\": []\n    }\n  ]\n}",
+    "error_formato": "El JSON no cumple el esquema de acciones y entidades.",
+    "latencia_llm_s": 20.657084399994346,
+    "ram_actual_proceso_gib": 6.131561279296875,
+    "vram_actual_torch_gib": 0.0,
+    "id": "orden_001",
+    "modelo": "qwen15",
+    "dispositivo": "cpu",
+    "prompt": "fewshot"
+  }
+]

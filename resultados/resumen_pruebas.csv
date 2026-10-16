@@ -1,0 +1,10 @@
+﻿archivo,modelo,prompt,texto,json_valido,json_utilizable,requiere_aclaracion,latencia_llm_s,latencia_total_s,ram_actual_proceso_gib
+prueba_ambigua.json,qwen15,fewshot,Tráeme eso,False,False,,20.657084399994346,,6.131561279296875
+prueba_ambigua_v2.json,qwen15,fewshot,Tráeme eso,False,True,,27.639211800007615,,6.153717041015625
+prueba_ambigua_v3.json,qwen15,fewshot,Tráeme eso,False,True,True,26.194964599999366,,6.153572082519531
+prueba_audio.json,qwen15,fewshot,Trá el libro Verde.,True,True,False,31.585201800000505,34.360865900001954,6.352802276611328
+prueba_compuesta.json,qwen15,fewshot,Lleva el cuaderno amarillo a la oficina y entrégaselo a Pedro,True,True,,52.71938900000532,,6.146156311035156
+prueba_fewshot.json,qwen05,fewshot,Trae el vaso,False,,,10.479033499999787,,2.2098922729492188
+prueba_nueva.json,qwen05,fewshot,Trae el libro verde,False,True,,10.18750609998824,,2.210254669189453
+prueba_qwen15.json,qwen15,fewshot,Trae el libro verde,True,True,,24.159095700000762,,6.134380340576172
+prueba_texto.json,qwen05,zero,Trae el vaso,False,,,7.606460299997707,,2.2081260681152344

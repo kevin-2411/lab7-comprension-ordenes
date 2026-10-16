@@ -1,0 +1,56 @@
+[
+  {
+    "transcripcion": "Lleva el cuaderno amarillo a la oficina y entrégaselo a Pedro",
+    "acciones": [
+      {
+        "accion": "llevar",
+        "objetos": [
+          {
+            "nombre": "cuaderno",
+            "adjetivos": [
+              "amarillo"
+            ]
+          }
+        ],
+        "personas": [],
+        "lugares": [
+          {
+            "nombre": "oficina",
+            "adjetivos": []
+          }
+        ]
+      },
+      {
+        "accion": "entregar",
+        "objetos": [
+          {
+            "nombre": "cuaderno",
+            "adjetivos": [
+              "amarillo"
+            ]
+          }
+        ],
+        "personas": [
+          {
+            "nombre": "Pedro",
+            "adjetivos": []
+          }
+        ],
+        "lugares": []
+      }
+    ],
+    "respuesta": "Voy a llevar cuaderno amarillo a oficina. Luego, Voy a entregar cuaderno amarillo a Pedro.",
+    "json_valido": true,
+    "json_utilizable": true,
+    "markdown_retirado": false,
+    "salida_original": "{\n  \"acciones\": [\n    {\n      \"accion\": \"llevar\",\n      \"objetos\": [\n        {\n          \"nombre\": \"cuaderno\",\n          \"adjetivos\": [\"amarillo\"]\n        }\n      ],\n      \"personas\": [],\n      \"lugares\": [\n        {\n          \"nombre\": \"oficina\",\n          \"adjetivos\": []\n        }\n      ]\n    },\n    {\n      \"accion\": \"entregar\",\n      \"objetos\": [\n        {\n          \"nombre\": \"cuaderno\",\n          \"adjetivos\": [\"amarillo\"]\n        }\n      ],\n      \"personas\": [\n        {\n          \"nombre\": \"Pedro\",\n          \"adjetivos\": []\n        }\n      ],\n      \"lugares\": []\n    }\n  ]\n}",
+    "error_formato": null,
+    "latencia_llm_s": 52.71938900000532,
+    "ram_actual_proceso_gib": 6.146156311035156,
+    "vram_actual_torch_gib": 0.0,
+    "id": "orden_001",
+    "modelo": "qwen15",
+    "dispositivo": "cpu",
+    "prompt": "fewshot"
+  }
+]

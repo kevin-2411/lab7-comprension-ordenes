@@ -1,0 +1,31 @@
+[
+  {
+    "transcripcion": "Trae el libro verde",
+    "acciones": [
+      {
+        "accion": "traer",
+        "objetos": [
+          {
+            "nombre": "libro",
+            "adjetivos": []
+          }
+        ],
+        "personas": [],
+        "lugares": []
+      }
+    ],
+    "respuesta": "Voy a traer libro.",
+    "json_valido": false,
+    "json_utilizable": true,
+    "markdown_retirado": true,
+    "salida_original": "```json\n{\n  \"acciones\": [\n    {\n      \"accion\": \"traer\",\n      \"objetos\": [\n        {\n          \"nombre\": \"libro\",\n          \"adjetivos\": []\n        }\n      ],\n      \"personas\": [],\n      \"lugares\": []\n    }\n  ]\n}\n```",
+    "error_formato": "La salida original no es un único JSON válido.",
+    "latencia_llm_s": 10.18750609998824,
+    "ram_actual_proceso_gib": 2.210254669189453,
+    "vram_actual_torch_gib": 0.0,
+    "id": "orden_001",
+    "modelo": "qwen05",
+    "dispositivo": "cpu",
+    "prompt": "fewshot"
+  }
+]

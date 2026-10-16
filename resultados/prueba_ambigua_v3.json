@@ -1,0 +1,41 @@
+[
+  {
+    "transcripcion": "Tráeme eso",
+    "acciones": [
+      {
+        "accion": "traer",
+        "objetos": [
+          {
+            "nombre": "eso",
+            "adjetivos": []
+          }
+        ],
+        "personas": [],
+        "lugares": []
+      }
+    ],
+    "acciones_ejecutables": [],
+    "requiere_aclaracion": true,
+    "referentes_sin_resolver": [
+      {
+        "indice_accion": 0,
+        "categoria": "objetos",
+        "nombre": "eso",
+        "motivo": "El modelo devolvió un pronombre sin identificar el objeto."
+      }
+    ],
+    "respuesta": "¿A qué objeto te refieres? Dime su nombre, por favor.",
+    "json_valido": false,
+    "json_utilizable": true,
+    "markdown_retirado": true,
+    "salida_original": "```json\n{\n  \"acciones\": [\n    {\n      \"accion\": \"traer\",\n      \"objetos\": [\n        {\n          \"nombre\": \"eso\",\n          \"adjetivos\": []\n        }\n      ],\n      \"personas\": [],\n      \"lugares\": []\n    }\n  ]\n}\n```",
+    "error_formato": "La salida original no es un único JSON válido.",
+    "latencia_llm_s": 26.194964599999366,
+    "ram_actual_proceso_gib": 6.153572082519531,
+    "vram_actual_torch_gib": 0.0,
+    "id": "orden_001",
+    "modelo": "qwen15",
+    "dispositivo": "cpu",
+    "prompt": "fewshot"
+  }
+]
