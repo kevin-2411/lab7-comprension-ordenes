@@ -1,0 +1,55 @@
+[
+  {
+    "transcripcion": "Trae la pelota roja.",
+    "acciones": [
+      {
+        "accion": "traer",
+        "objetos": [
+          {
+            "nombre": "pelota",
+            "adjetivos": [
+              "roja"
+            ]
+          }
+        ],
+        "personas": [],
+        "lugares": []
+      }
+    ],
+    "acciones_ejecutables": [
+      {
+        "accion": "traer",
+        "objetos": [
+          {
+            "nombre": "pelota",
+            "adjetivos": [
+              "roja"
+            ]
+          }
+        ],
+        "personas": [],
+        "lugares": []
+      }
+    ],
+    "requiere_aclaracion": false,
+    "referentes_sin_resolver": [],
+    "respuesta": "Voy a traer pelota roja.",
+    "json_valido": true,
+    "json_utilizable": true,
+    "markdown_retirado": false,
+    "salida_original": "{\n  \"acciones\": [\n    {\n      \"accion\": \"traer\",\n      \"objetos\": [\n        {\n          \"nombre\": \"pelota\",\n          \"adjetivos\": [\"roja\"]\n        }\n      ],\n      \"personas\": [],\n      \"lugares\": []\n    }\n  ]\n}",
+    "error_formato": null,
+    "latencia_llm_s": 27.078519699978642,
+    "latencia_s2t_s": 1.8427019999944605,
+    "latencia_t2s_s": 0.1032202000496909,
+    "latencia_total_s": 29.038049699971452,
+    "audio_respuesta": "resultados\\respuestas_audio\\orden_001.wav",
+    "ram_actual_proceso_gib": 6.558460235595703,
+    "vram_actual_torch_gib": 0.0,
+    "id": "orden_001",
+    "modelo": "qwen15",
+    "dispositivo": "cpu",
+    "prompt": "fewshot",
+    "archivo_entrada": "resultados\\capturas_microfono\\microfono_df4a85e5ee1440cab5f473f5357fad97.wav"
+  }
+]
